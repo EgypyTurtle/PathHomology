@@ -1,4 +1,4 @@
-# PathHomology
+﻿# PathHomology
 
 An implementation of GLMY path homology, a record of the optimisation rounds it went
 through, and a point-by-point comparison against the worked examples of the public
@@ -186,3 +186,15 @@ results/                       raw output of the three checks and the self-tests
 3. S. Chowdhury, S. Huntsman, M. Yutin, *Path homologies of motifs and temporal
    network representations*, Applied Network Science **7**:4 (2022),
    doi:10.1007/s41109-021-00441-z.
+
+## Digraph families
+
+`families/` collects path-homology computations for classical digraph
+families and for Cayley digraphs of finite groups: transitive and regular
+tournaments, every tournament up to isomorphism on at most five vertices,
+directed and bidirectional cycles, complete and complete bipartite digraphs,
+de Bruijn digraphs, all groups of order at most 10, and the permutation
+groups S_n and A_n, together with how subgroups, Cartesian products and
+quotients appear. See `families/README.md` for the index and
+`families/COMPLEXITY.md` for the cost model and the estimated reach of the
+engine inside a three-hour budget.
