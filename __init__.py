@@ -27,7 +27,7 @@ The computation follows the paper step by step:
    ``B_p = partial Omega_{p+1}`` and homology ``H_p = Z_p / B_p`` (3.11).
 """
 
-from core import (
+from .core import (
     DEFAULT_MAX_DIM,
     PathHomologyResult,
     allowed_paths,

@@ -14,14 +14,24 @@ import json
 import sys
 from typing import Dict, List, Optional, Sequence, Tuple
 
-from core import (
-    PathHomologyResult,
-    allowed_paths,
-    boundary_matrix,
-    bridges,
-    path_homology,
-    semi_edges,
-)
+if __package__:
+    from .core import (
+        PathHomologyResult,
+        allowed_paths,
+        boundary_matrix,
+        bridges,
+        path_homology,
+        semi_edges,
+    )
+else:
+    from core import (
+        PathHomologyResult,
+        allowed_paths,
+        boundary_matrix,
+        bridges,
+        path_homology,
+        semi_edges,
+    )
 
 __all__ = ["main", "build_parser", "EXAMPLES"]
 
@@ -171,6 +181,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="how Omega_p is computed (default: auto)",
     )
     common.add_argument(
+        "--homology-method", choices=["linear", "morse"], default="linear",
+        help="homology backend: legacy linear algebra or exact algebraic Morse cancellation",
+    )
+    common.add_argument(
+        "--no-boundary-matrices", action="store_true",
+        help="omit dense allowed-path boundary matrices (with Morse, or dimensions-only)",
+    )
+    common.add_argument(
         "--float", action="store_true",
         help="use floating point instead of exact rational arithmetic",
     )
@@ -179,7 +197,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="coefficient field: 'Q' (exact rationals, default), 'Z2'/'GF2'/2 "
              "(two-element field), a prime p for GF(p), or 'R'",
     )
+    common.add_argument(
+        "--dimensions-only", action="store_true",
+        help="compute dimensions/Betti numbers with sparse rank only; skip matrices and generators",
+    )
     common.add_argument("--json", action="store_true", help="emit JSON")
+    common.add_argument(
+        "--stream", action="store_true",
+        help="dimensions only, retaining no paths; prune a proved zero Omega tail",
+    )
 
     run = sub.add_parser("run", parents=[common], help="analyse one digraph")
     run.add_argument(
@@ -219,6 +245,11 @@ def _result_to_json(res: PathHomologyResult) -> dict:
     return {
         "vertices": [str(v) for v in res.vertices],
         "edges": [[str(u), str(v)] for u, v in res.edges],
+        "generators_materialized": res.generators_materialized,
+        "matrices_materialized": res.matrices_materialized,
+        "paths_materialized": res.paths_materialized,
+        "homology_method": res.homology_method,
+        "morse_stats": res.morse_stats,
         "allowed_paths": {
             str(p): ["".join(str(x) for x in t) for t in res.allowed[p]]
             for p in sorted(res.allowed)
@@ -227,7 +258,7 @@ def _result_to_json(res: PathHomologyResult) -> dict:
             str(p): [[str(c) for c in row] for row in res.boundary_matrices[p].tolist()]
             for p in sorted(res.boundary_matrices)
         },
-        "dim_allowed": {str(p): len(res.allowed[p]) for p in sorted(res.allowed)},
+        "dim_allowed": {str(p): value for p, value in res.dim_allowed.items()},
         "dim_omega": {str(p): res.dim_omega[p] for p in sorted(res.dim_omega)},
         "dim_cycles": {str(p): res.dim_cycles.get(p, 0) for p in sorted(res.dim_omega)},
         "dim_boundaries": {
@@ -268,6 +299,10 @@ def _cmd_run(args) -> int:
         exact=not args.float,
         field=args.field,
         method=args.method,
+        homology_method=args.homology_method,
+        generators=not (args.dimensions_only or args.stream),
+        store_matrices=False if args.no_boundary_matrices else None,
+        store_paths=not args.stream,
     )
 
     if args.json:
@@ -329,7 +364,7 @@ def _profile_on_axes(ax, res, plot_dimension_profile):
     w = 0.27
     ax.bar(
         [i - w for i in x],
-        [len(res.allowed.get(p, [])) for p in dims], w,
+        [res.dim_allowed.get(p, 0) for p in dims], w,
         label=r"$\dim A_p$", color="#cbd5e1",
     )
     ax.bar(

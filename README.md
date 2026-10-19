@@ -9,6 +9,26 @@ The reference implementation follows:
 > A. Grigor'yan, Y. Lin, Y. Muranov, S.-T. Yau,
 > *Homologies of path complexes and digraphs*, arXiv:1207.2834v4.
 
+## Update: gen6 and algebraic Morse reduction (2026-10-19)
+
+The existing implementation, optimisation history, literature checks and digraph
+families below are retained. The root `core.py` is now **gen6**. New features include
+streaming dimension-only calculations, stronger Omega-support pruning and exact
+rank certificates, and an optional **algebraic Morse backend** for explicit
+representatives. The default remains `homology_method="linear"`; ordinary path
+homology is not silently replaced by a persistent or Laplacian calculation.
+
+- [Algebraic Morse technique, proof, and application to Omega_*](docs/ALGEBRAIC_MORSE_PATH_HOMOLOGY_20261019.md)
+- [Current measurements and their limitations](docs/MORSE_PERFORMANCE_20261019.md)
+- [Current version index](VERSIONS.md) and [repository update details](docs/REPOSITORY_UPDATE.md)
+
+Tested setup: Python 3.12 and NumPy 2.3.5 (`python -m pip install -r requirements.txt`).
+Run `python -B examples.py`, `python -B verify_release.py`, and
+`python -B verify_repository.py`. The last two commands cover 10 release checks
+and four existing repository validation entry points; all 14 passed locally.
+GitHub Actions is configured for Windows/Linux; cloud results are separate from
+the local verification record.
+
 ---
 
 ## 1. The original implementation
@@ -31,8 +51,11 @@ from the paper's definitions:
 - A `regular=True/False` switch selects the regular or the non-regular boundary
   convention (Section 2.3 and (2.10) of the paper). The default is `regular=False`.
 
-The current version is `core.py` (generation 3, 87,483 bytes). The two are
-interface-compatible and can be swapped freely.
+The current version is `core.py` (generation 6, 116,557 bytes). Its default linear
+backend preserves the existing usage. The new Morse backend additionally requires
+`morse.py` and can return different, valid bases of cycles, boundaries and homology,
+all lifted to the original allowed-path coordinates. The original version remains
+available as `original_core.py`; it does not implement the newly added options.
 
 ## 2. What each optimisation round changed
 
@@ -42,8 +65,11 @@ interface-compatible and can be swapped freely.
 | 1 | gen1 | 65728 | (a) Every prime field is converted to an integer NumPy array for elimination, nullspace, rank, pivots and matrix products, then converted back to `GF` objects. (b) Matrices over `Q` that are integral and provably free of int64 overflow use a native int64 kernel; genuine fractions still fall back to `Fraction`. (c) The canonical basis produced by the nullspace routine has an identity block on its free coordinates, so change of basis reads those rows directly instead of running a new elimination. (d) Expanding cycles, boundaries and homology representatives from Omega coordinates back to paths is done in one batch per dimension instead of one matrix product per column. (e) The constraint matrix keeps only the rows that a boundary can actually hit. |
 | 2 | gen2 | 82143 | (a) Rank and nullspace over `Q` are computed fraction-free, by clearing denominators row by row and eliminating with primitive integer rows; `Fraction` is used only in the final back-substitution. Still exact. (b) Each differential is reduced once: the rank comes from the rank-nullity theorem instead of a second elimination. (c) The case `Omega_p = A_p` is detected explicitly and reuses existing coordinates. (d) A new **`generators=False` dimension-only mode**: it returns only `dim Omega_p = (number of p-paths) - rank(C_p)` and `dim Z_p = (number of p-paths) - rank(F_p)`, where `C_p` is the non-allowed-face constraint matrix and `F_p` the full boundary on allowed p-paths. No Omega basis, no change of basis, no representatives. Boundary rows are stored as sparse dictionaries, and over `F_2` they are packed into Python big-integer bit rows. |
 | 3 | gen3 | 87483 | (a) For an integer matrix, the rank mod 2 is computed first. It is a strict lower bound for the rational rank; if it reaches `min(number of non-zero rows, number of columns)` the rational rank is certified unconditionally and no integer elimination runs. (b) The chain condition `im(d_p) is contained in ker(d_{p-1})` supplies a tighter upper bound; when the two bounds meet, that is again a certificate. Otherwise the code falls back to exact elimination, so the algorithm is never probabilistic. (c) The rank of the first differential is taken from the incidence-matrix theorem: it equals the number of vertices minus the number of weak components. (d) Sparse row elimination merges non-zero entries in place. (e) All free variables of an exact nullspace are back-substituted in one batch. (f) Over `F_2`, small and medium widths build big-integer bit rows directly; very wide matrices fall back to sparse dictionaries and are packed once. |
+| 4 | gen4 | 97942 | Sparse no-fill singleton peeling, certified zero Omega tails, Omega_2 support and higher-prefix pruning, sparse columns, and `store_paths=False` streaming dimensions with exact formal path counts. |
+| 5 | gen5 | 110690 | Two-sided, multilayer support pruning and forced-zero propagation; canonical Omega bases computed on retained candidates and lifted back; stronger chain-condition rank bounds, certified multi-prime ranks, component splitting and sparse ordering. |
+| 6 | gen6 | 116557 | Optional exact `homology_method="morse"`: construct the Omega differential sparsely, cancel invertible pairs on the chain complex, and lift Z/B/H bases to original paths. Allows `store_matrices=False` while returning generators. The default linear and streaming rank routes remain available. |
 
-### Measured speed-up
+### Historical measured speed-up (gen0 through gen3)
 
 Same machine; the Betti numbers agree between all four algorithms on every case.
 "dim-only" is the `generators=False` mode of gen3.
@@ -60,6 +86,26 @@ Same machine; the Betti numbers agree between all four algorithms on every case.
 
 Overall, from the original version to the current dimension-only mode, the speed-up
 is about 2x10^4 on `F_2` and 3x10^4 on `Q`.
+
+These are the original gen0/gen3 measurements, not a new measurement of gen6.
+
+### Current gen5 versus gen6 comparison
+
+Three-run medians on the same machine, with explicit generators and dense
+allowed-path boundary matrices retained in **both** modes:
+
+| Case and target | Field | gen5 linear | gen6 Morse |
+|---|---|---:|---:|
+| sparse digraph, 300 vertices / 900 arcs, through H_2 | Q | 10.200 s | 0.297 s |
+| three-dimensional periodic grid, 125 vertices / 375 arcs, through H_3 | Q | 16.914 s | 0.697 s |
+
+The grid has Betti numbers `(1,3,3,1)`. Both timings include Omega construction.
+The gain combines chain cancellation with sparse engineering and less redundant
+boundary output; it is **not** the effect of an abstract theorem in isolation.
+The [performance report](docs/MORSE_PERFORMANCE_20261019.md) includes an empty-column
+matrix-product ablation, memory measurements, raw records, and censored cases.
+Morse does not remove the cost of constructing Omega or guarantee a speed-up on
+every graph. Its representatives need not agree term-by-term with the old basis.
 
 ## 3. Agreement with the public literature
 
@@ -144,7 +190,9 @@ Output: `results/torsion_conjecture.txt`.
 
 ## Usage
 
-Requires Python 3 and NumPy. `core.py` alone is enough to compute.
+Requires Python and NumPy; Python 3.12 / NumPy 2.3.5 is the verified setup.
+`core.py` alone is enough for default or dimensions-only calculations;
+the Morse backend additionally needs `morse.py`.
 
 ```python
 from core import path_homology
@@ -152,7 +200,8 @@ r = path_homology(vertices=[0, 1, 2], edges=[(0, 1), (1, 2)], max_dim=3, field="
 print(r.dim_omega, r.betti)
 ```
 
-When only Betti numbers are needed, use `generators=False` (45x to 731x faster):
+When only Betti numbers are needed, use `generators=False` (the historical
+gen3 measurements above showed an additional 45x to 731x speed-up):
 
 ```python
 r = path_homology(vertices=v, edges=E, max_dim=6, field="Q", generators=False)
@@ -165,13 +214,69 @@ python check_torsion.py           # Chowdhury-Huntsman-Yutin torsion conjecture
 python test_path_homology.py      # self-tests
 ```
 
+### Current usage and coefficients (gen6)
+
+Current minimal usage and coefficient conventions:
+
+```python
+from core import path_homology
+v = [0, 1, 2, 3]
+E = [(0, 1), (1, 2), (2, 3), (3, 0)]
+k = 1
+
+# H_0,...,H_k dimensions, without explicit Omega bases or representatives.
+dims = path_homology(v, E, max_dim=k+1, field="Q", loops=False,
+                     generators=False, store_paths=False)
+print({p: dims.betti[p] for p in range(k+1)})  # {0: 1, 1: 1}
+
+# Explicit representatives in ORIGINAL path coordinates; no additional
+# dense allowed-path boundary matrices, but Omega bases are still constructed.
+r = path_homology(v, E, max_dim=k+1, field="Q", loops=False,
+                  homology_method="morse", store_matrices=False)
+print(r.homology_basis[1])
+print(r.morse_stats)
+```
+
+- To compute the original graph's H_k, enumerate through **at least k+1**, unless
+  Omega_(k+1)=0 has been separately certified. The top truncation's homology is not
+  automatically the original graph's homology in that degree.
+- Morse supports exact **Q and prime fields F_p**, e.g. `field=2`, `3`, `5`, `101`;
+  it is not restricted to F_2. It does **not** implement arbitrary coefficient
+  rings, integral torsion, or arbitrary extension fields. Floating-point `R`
+  continues to use the linear backend. The independent Smith-form calculation in
+  `check_torsion.py` is retained; it is not an integral Morse backend.
+- Morse requires `generators=True` (the default). Omega's canonical basis stays
+  unchanged; its Z/B/H bases may differ from the linear route. Its boundary output
+  is an independent basis rather than possibly redundant columns.
+- `regular=False` and `loops=True` remain defaults. The example explicitly removes
+  loops; use `regular=True` only when that boundary convention is intended.
+- Chain homotopy equivalence here does not by itself preserve a filtration or
+  the nonzero spectrum of the original Laplacian. Neither separate project is
+  replaced by this ordinary path-homology reduction.
+
+```bash
+python cli.py run --edges "0-1,1-2,2-3,3-0" --max-dim 2 --stream --json
+python cli.py run --edges "0-1,1-2,2-3,3-0" --max-dim 2 --homology-method morse --no-boundary-matrices --json
+```
+
 ## Layout
 
 ```
-core.py                        current implementation (gen3)
+core.py                        current implementation (gen6)
+morse.py                       exact algebraic Morse cancellation and lifts
 original_core.py               first version (gen0)
 docs/OPTIMIZATION_REPORT.md    full optimisation report
-docs/VERSIONS.md               the four generations: bytes, dates, hashes, changes
+VERSIONS.md                    current version index and hashes
+docs/VERSIONS.md               annotated historical gen0--gen3 record
+docs/ALGEBRAIC_MORSE_PATH_HOMOLOGY_20261019.md  technique and proof
+docs/MORSE_PERFORMANCE_20261019.md             current performance report
+performance_morse_20261019/    raw measurements and verification summaries
+reference/                     fixed gen0/gen3 sources and historical oracle
+_baseline_gen4_20261019/        fixed gen4 regression source
+_baseline_gen5_20261019/        fixed gen5 comparison source
+verify_release.py              10 portable release checks
+verify_repository.py           four retained repository validation checks
+.local-results/                ignored fresh local verification outputs
 check_paper_examples.py        GLMY worked examples
 check_circulant.py             Tang-Yau theorems
 check_torsion.py               torsion conjecture
@@ -187,14 +292,26 @@ results/                       raw output of the three checks and the self-tests
    network representations*, Applied Network Science **7**:4 (2022),
    doi:10.1007/s41109-021-00441-z.
 
+4. E. Sköldberg, *Algebraic Morse theory and homological perturbation theory*,
+   [arXiv:1311.5803](https://arxiv.org/abs/1311.5803).
+5. L. Lampret, *Chain complex reduction via fast digraph traversal*,
+   [arXiv:1903.00783](https://arxiv.org/abs/1903.00783). This implementation uses
+   sequential elementary cancellations, not that paper's batch matching/traversal
+   algorithm.
+
 ## Digraph families
 
-`families/` collects path-homology computations for classical digraph
+`families/` collects path-homology computations for classical digraph
 families and for Cayley digraphs of finite groups: transitive and regular
 tournaments, every tournament up to isomorphism on at most five vertices,
 directed and bidirectional cycles, complete and complete bipartite digraphs,
 de Bruijn digraphs, all groups of order at most 10, and the permutation
 groups S_n and A_n, together with how subgroups, Cartesian products and
-quotients appear. See `families/README.md` for the index and
-`families/COMPLEXITY.md` for the cost model and the estimated reach of the
+quotients appear. See `families/README.md` for the index and
+`families/COMPLEXITY.md` for the cost model and the estimated reach of the
 engine inside a three-hour budget.
+
+Those studies and their original results are retained unchanged; this update does
+not claim that all family scans have been rerun with gen6. Some historical family
+scripts rely on research-engine files not included in the original repository;
+see [the update notes](docs/REPOSITORY_UPDATE.md) for the verification boundary.

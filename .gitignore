@@ -1,4 +1,22 @@
-﻿__pycache__/
-*.pyc
+__pycache__/
+*.py[cod]
 .venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.local-results/
+build/
+dist/
+*.egg-info/
+.DS_Store
+Thumbs.db
+.env
+.env.*
+!.env.example
+*.zip
 
+# Historical _baseline_* sources are intentional, versioned test fixtures.
+# performance_morse_20261019 contains published evidence, not temporary output.

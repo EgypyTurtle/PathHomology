@@ -1,0 +1,126 @@
+{
+  "source_sha256": "dd247bdcfa5ac2d61981b93b5a70592ee3d8a33b960ea71d6e08bc7228a04ac7",
+  "driver_sha256": "d881d521c3d2273a11da0141ff43d5fe3cb662b2cd94c0428056674dda005a65",
+  "checks": [
+    {
+      "index": 0,
+      "graph_sha256": "747531d5b09188efa6d16c5369260f1ae64de8defb8f4f12959ad02d362300c6",
+      "oracle_seconds": 0.0021341999527066946,
+      "field": "Q",
+      "betti": {
+        "0": 1,
+        "1": 263,
+        "2": 0,
+        "3": 0
+      },
+      "completed_runs_checked": 9
+    },
+    {
+      "index": 1,
+      "graph_sha256": "58e32e2e07621845e56d1fe31f15f42cc6c01a4f5f78e09a35330adced8f928c",
+      "oracle_seconds": 0.0032184000010602176,
+      "field": "Q",
+      "betti": {
+        "0": 1,
+        "1": 559,
+        "2": 0,
+        "3": 0
+      },
+      "completed_runs_checked": 12
+    },
+    {
+      "index": 2,
+      "graph_sha256": "58e32e2e07621845e56d1fe31f15f42cc6c01a4f5f78e09a35330adced8f928c",
+      "oracle_seconds": 0.0035764999920502305,
+      "field": 2,
+      "betti": {
+        "0": 1,
+        "1": 559,
+        "2": 0,
+        "3": 0
+      },
+      "completed_runs_checked": 9
+    },
+    {
+      "index": 3,
+      "graph_sha256": "d4bf752a47b014e153429ce7bd76a007a726cb1ac1db2f8d0359050033386c28",
+      "oracle_seconds": 0.005889300024136901,
+      "field": "Q",
+      "betti": {
+        "0": 1,
+        "1": 957,
+        "2": 0,
+        "3": 0
+      },
+      "completed_runs_checked": 2
+    },
+    {
+      "index": 4,
+      "graph_sha256": "ce8ad7324d196314a6433770fce74c7538da3bdfeefa19956796e300887994fe",
+      "oracle_seconds": 0.06575400003930554,
+      "field": "Q",
+      "betti": {
+        "0": 1,
+        "1": 3,
+        "2": 3,
+        "3": 1,
+        "4": 0
+      },
+      "completed_runs_checked": 12
+    },
+    {
+      "index": 5,
+      "graph_sha256": "dbaa508500df710bc8a60e2b4a01c6f0d29d7f7fc204d90751a87bf6a7c1f6d4",
+      "oracle_seconds": 0.06979259999934584,
+      "field": 3,
+      "betti": {
+        "0": 1,
+        "1": 3,
+        "2": 3,
+        "3": 1,
+        "4": 0
+      },
+      "completed_runs_checked": 2
+    },
+    {
+      "index": 6,
+      "graph_sha256": "d3d7e5786efda90766c8bba5b51802e0bd3ff191395b0bc9457373662d1769f1",
+      "oracle_seconds": 0.008573800034355372,
+      "field": 2,
+      "betti": {
+        "0": 1,
+        "1": 0,
+        "2": 0,
+        "3": 0,
+        "4": 1287
+      },
+      "completed_runs_checked": 9
+    },
+    {
+      "index": 7,
+      "graph_sha256": "e868bf6e1cb1e111390b82f605a8054e9bbf1e8095268b2c771c7d55ea5bb648",
+      "oracle_seconds": 0.03657779999775812,
+      "field": "Q",
+      "betti": {
+        "0": 1,
+        "1": 0,
+        "2": 2,
+        "3": 151
+      },
+      "completed_runs_checked": 9
+    },
+    {
+      "index": 8,
+      "graph_sha256": "43f3c9512bf62be92dd5855c035f0baac81bc415b45efe9709dbb02815bf0f2b",
+      "oracle_seconds": 0.010737499978858978,
+      "field": 2,
+      "betti": {
+        "0": 1,
+        "1": 1959,
+        "2": 0,
+        "3": 0
+      },
+      "completed_runs_checked": 3
+    }
+  ]
+}

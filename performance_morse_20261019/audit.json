@@ -1,0 +1,950 @@
+{
+  "final_runs": 68,
+  "successful_runs": 67,
+  "graph_field_cases": 9,
+  "regression_suites": 11,
+  "independent_rank_checks": 9,
+  "repeated_medians": [
+    {
+      "index": 0,
+      "engine": "linear",
+      "median_seconds": 2.8196734999655746,
+      "time_range": [
+        2.744234999991022,
+        3.0461812000139616
+      ],
+      "median_private_mib": 156.9921875
+    },
+    {
+      "index": 0,
+      "engine": "morse",
+      "median_seconds": 0.11133350001182407,
+      "time_range": [
+        0.10955990001093596,
+        0.11408820003271103
+      ],
+      "median_private_mib": 73.88671875
+    },
+    {
+      "index": 0,
+      "engine": "morse_sparse",
+      "median_seconds": 0.07798550004372373,
+      "time_range": [
+        0.07343829999445006,
+        0.07843479997245595
+      ],
+      "median_private_mib": 26.62109375
+    },
+    {
+      "index": 1,
+      "engine": "linear",
+      "median_seconds": 10.20011340000201,
+      "time_range": [
+        10.199117400043178,
+        10.413300399959553
+      ],
+      "median_private_mib": 565.0078125
+    },
+    {
+      "index": 1,
+      "engine": "morse",
+      "median_seconds": 0.2972698000376113,
+      "time_range": [
+        0.29329120001057163,
+        0.3807368000270799
+      ],
+      "median_private_mib": 228.95703125
+    },
+    {
+      "index": 1,
+      "engine": "morse_sparse",
+      "median_seconds": 0.21134539996273816,
+      "time_range": [
+        0.20591530000092462,
+        0.2205633000121452
+      ],
+      "median_private_mib": 40.0546875
+    },
+    {
+      "index": 2,
+      "engine": "linear",
+      "median_seconds": 3.356869100010954,
+      "time_range": [
+        3.165808299963828,
+        3.4086776000331156
+      ],
+      "median_private_mib": 397.7265625
+    },
+    {
+      "index": 2,
+      "engine": "morse",
+      "median_seconds": 0.2431485999841243,
+      "time_range": [
+        0.24199559999397025,
+        0.25836130004609004
+      ],
+      "median_private_mib": 228.51171875
+    },
+    {
+      "index": 2,
+      "engine": "morse_sparse",
+      "median_seconds": 0.1551012999843806,
+      "time_range": [
+        0.1513823999557644,
+        0.16356990003259853
+      ],
+      "median_private_mib": 39.1640625
+    },
+    {
+      "index": 4,
+      "engine": "linear",
+      "median_seconds": 16.914370400016196,
+      "time_range": [
+        16.709998100006487,
+        31.316715700028
+      ],
+      "median_private_mib": 860.20703125
+    },
+    {
+      "index": 4,
+      "engine": "morse",
+      "median_seconds": 0.6973518999875523,
+      "time_range": [
+        0.6964864000328816,
+        0.8036142999771982
+      ],
+      "median_private_mib": 342.046875
+    },
+    {
+      "index": 4,
+      "engine": "morse_sparse",
+      "median_seconds": 0.5721320000011474,
+      "time_range": [
+        0.5641976000042632,
+        0.5768906999728642
+      ],
+      "median_private_mib": 46.30859375
+    },
+    {
+      "index": 6,
+      "engine": "linear",
+      "median_seconds": 2.1283560000010766,
+      "time_range": [
+        2.127948700042907,
+        2.183787600020878
+      ],
+      "median_private_mib": 220.18359375
+    },
+    {
+      "index": 6,
+      "engine": "morse",
+      "median_seconds": 0.8019663000013679,
+      "time_range": [
+        0.7963531999848783,
+        0.8106171999825165
+      ],
+      "median_private_mib": 124.83984375
+    },
+    {
+      "index": 6,
+      "engine": "morse_sparse",
+      "median_seconds": 0.7678115000016987,
+      "time_range": [
+        0.7657065999810584,
+        0.8174447999917902
+      ],
+      "median_private_mib": 105.0546875
+    },
+    {
+      "index": 7,
+      "engine": "linear",
+      "median_seconds": 0.7655819000210613,
+      "time_range": [
+        0.7583748000324704,
+        0.7779746999731287
+      ],
+      "median_private_mib": 36.71484375
+    },
+    {
+      "index": 7,
+      "engine": "morse",
+      "median_seconds": 0.1747911999700591,
+      "time_range": [
+        0.16782939998665825,
+        0.175028299971018
+      ],
+      "median_private_mib": 28.99609375
+    },
+    {
+      "index": 7,
+      "engine": "morse_sparse",
+      "median_seconds": 0.1657186999800615,
+      "time_range": [
+        0.16451270005200058,
+        0.1686411999980919
+      ],
+      "median_private_mib": 27.34375
+    },
+    {
+      "index": 8,
+      "engine": "morse_sparse",
+      "median_seconds": 1.446819999953732,
+      "time_range": [
+        1.429910300008487,
+        1.4559620999498293
+      ],
+      "median_private_mib": 193.3671875
+    }
+  ],
+  "other_runs": [
+    {
+      "family": "sparse",
+      "n": 300,
+      "h": 2,
+      "field": "Q",
+      "engine": "linear_guard",
+      "status": "ok",
+      "wall_seconds": 2.7730395000544377,
+      "peak_private_mib": 270.6015625,
+      "peak_rss_mib": 280.7421875,
+      "seconds": 2.291222099971492,
+      "graph_sha256": "58e32e2e07621845e56d1fe31f15f42cc6c01a4f5f78e09a35330adced8f928c",
+      "edges": 900,
+      "formal_paths": [
+        300,
+        900,
+        2700,
+        8100
+      ],
+      "betti": {
+        "0": 1,
+        "1": 559,
+        "2": 0,
+        "3": 0
+      },
+      "omega": {
+        "0": 300,
+        "1": 900,
+        "2": 42,
+        "3": 0,
+        "4": 0
+      },
+      "cycles": {
+        "0": 300,
+        "1": 601,
+        "2": 0,
+        "3": 0
+      },
+      "boundaries": {
+        "0": 299,
+        "1": 42,
+        "2": 0,
+        "3": 0
+      },
+      "h_counts": {
+        "0": 1,
+        "1": 559,
+        "2": 0,
+        "3": 0
+      },
+      "morse_stats": {},
+      "dense_matrices": true,
+      "representatives_closed": true,
+      "index": 1,
+      "repetition": 0,
+      "source_log": "ablation.jsonl"
+    },
+    {
+      "family": "sparse",
+      "n": 300,
+      "h": 2,
+      "field": "Q",
+      "engine": "morse",
+      "status": "ok",
+      "wall_seconds": 0.991521299991291,
+      "peak_private_mib": 229.3125,
+      "peak_rss_mib": 239.921875,
+      "seconds": 0.3440608999808319,
+      "graph_sha256": "58e32e2e07621845e56d1fe31f15f42cc6c01a4f5f78e09a35330adced8f928c",
+      "edges": 900,
+      "formal_paths": [
+        300,
+        900,
+        2700,
+        8100
+      ],
+      "betti": {
+        "0": 1,
+        "1": 559,
+        "2": 0,
+        "3": 0
+      },
+      "omega": {
+        "0": 300,
+        "1": 900,
+        "2": 42,
+        "3": 0,
+        "4": 0
+      },
+      "cycles": {
+        "0": 300,
+        "1": 601,
+        "2": 0,
+        "3": 0
+      },
+      "boundaries": {
+        "0": 299,
+        "1": 42,
+        "2": 0,
+        "3": 0
+      },
+      "h_counts": {
+        "0": 1,
+        "1": 559,
+        "2": 0,
+        "3": 0
+      },
+      "morse_stats": {
+        "pairs": 341,
+        "unit_pivots": 341,
+        "schur_updates": 2103,
+        "new_entries": 1502,
+        "initial_nnz": 1952,
+        "critical_dimensions": {
+          "0": 1,
+          "1": 559,
+          "2": 0,
+          "3": 0
+        },
+        "lift_nnz": 8674,
+        "boundary_nnz": 750
+      },
+      "dense_matrices": true,
+      "representatives_closed": true,
+      "index": 1,
+      "repetition": 0,
+      "source_log": "ablation.jsonl"
+    },
+    {
+      "family": "sparse",
+      "n": 300,
+      "h": 2,
+      "field": "Q",
+      "engine": "morse_sparse",
+      "status": "ok",
+      "wall_seconds": 0.6873614999931306,
+      "peak_private_mib": 39.83203125,
+      "peak_rss_mib": 50.94921875,
+      "seconds": 0.21921870001824573,
+      "graph_sha256": "58e32e2e07621845e56d1fe31f15f42cc6c01a4f5f78e09a35330adced8f928c",
+      "edges": 900,
+      "formal_paths": [
+        300,
+        900,
+        2700,
+        8100
+      ],
+      "betti": {
+        "0": 1,
+        "1": 559,
+        "2": 0,
+        "3": 0
+      },
+      "omega": {
+        "0": 300,
+        "1": 900,
+        "2": 42,
+        "3": 0,
+        "4": 0
+      },
+      "cycles": {
+        "0": 300,
+        "1": 601,
+        "2": 0,
+        "3": 0
+      },
+      "boundaries": {
+        "0": 299,
+        "1": 42,
+        "2": 0,
+        "3": 0
+      },
+      "h_counts": {
+        "0": 1,
+        "1": 559,
+        "2": 0,
+        "3": 0
+      },
+      "morse_stats": {
+        "pairs": 341,
+        "unit_pivots": 341,
+        "schur_updates": 2103,
+        "new_entries": 1502,
+        "initial_nnz": 1952,
+        "critical_dimensions": {
+          "0": 1,
+          "1": 559,
+          "2": 0,
+          "3": 0
+        },
+        "lift_nnz": 8674,
+        "boundary_nnz": 750
+      },
+      "dense_matrices": false,
+      "representatives_closed": true,
+      "index": 1,
+      "repetition": 0,
+      "source_log": "ablation.jsonl"
+    },
+    {
+      "family": "torus",
+      "n": 125,
+      "h": 3,
+      "field": "Q",
+      "side": 5,
+      "dimension": 3,
+      "engine": "linear_guard",
+      "status": "ok",
+      "wall_seconds": 4.805946899985429,
+      "peak_private_mib": 399.32421875,
+      "peak_rss_mib": 408.8984375,
+      "seconds": 4.339659199991729,
+      "graph_sha256": "ce8ad7324d196314a6433770fce74c7538da3bdfeefa19956796e300887994fe",
+      "edges": 375,
+      "formal_paths": [
+        125,
+        375,
+        1125,
+        3375,
+        10125
+      ],
+      "betti": {
+        "0": 1,
+        "1": 3,
+        "2": 3,
+        "3": 1,
+        "4": 0
+      },
+      "omega": {
+        "0": 125,
+        "1": 375,
+        "2": 375,
+        "3": 125,
+        "4": 0,
+        "5": 0
+      },
+      "cycles": {
+        "0": 125,
+        "1": 251,
+        "2": 127,
+        "3": 1,
+        "4": 0
+      },
+      "boundaries": {
+        "0": 124,
+        "1": 248,
+        "2": 124,
+        "3": 0,
+        "4": 0
+      },
+      "h_counts": {
+        "0": 1,
+        "1": 3,
+        "2": 3,
+        "3": 1,
+        "4": 0
+      },
+      "morse_stats": {},
+      "dense_matrices": true,
+      "representatives_closed": true,
+      "index": 4,
+      "repetition": 0,
+      "source_log": "ablation.jsonl"
+    },
+    {
+      "family": "torus",
+      "n": 125,
+      "h": 3,
+      "field": "Q",
+      "side": 5,
+      "dimension": 3,
+      "engine": "morse",
+      "status": "ok",
+      "wall_seconds": 1.1709745999542065,
+      "peak_private_mib": 341.6953125,
+      "peak_rss_mib": 351.41796875,
+      "seconds": 0.7062536000157706,
+      "graph_sha256": "ce8ad7324d196314a6433770fce74c7538da3bdfeefa19956796e300887994fe",
+      "edges": 375,
+      "formal_paths": [
+        125,
+        375,
+        1125,
+        3375,
+        10125
+      ],
+      "betti": {
+        "0": 1,
+        "1": 3,
+        "2": 3,
+        "3": 1,
+        "4": 0
+      },
+      "omega": {
+        "0": 125,
+        "1": 375,
+        "2": 375,
+        "3": 125,
+        "4": 0,
+        "5": 0
+      },
+      "cycles": {
+        "0": 125,
+        "1": 251,
+        "2": 127,
+        "3": 1,
+        "4": 0
+      },
+      "boundaries": {
+        "0": 124,
+        "1": 248,
+        "2": 124,
+        "3": 0,
+        "4": 0
+      },
+      "h_counts": {
+        "0": 1,
+        "1": 3,
+        "2": 3,
+        "3": 1,
+        "4": 0
+      },
+      "morse_stats": {
+        "pairs": 496,
+        "unit_pivots": 496,
+        "schur_updates": 1488,
+        "new_entries": 516,
+        "initial_nnz": 3000,
+        "critical_dimensions": {
+          "0": 1,
+          "1": 3,
+          "2": 3,
+          "3": 1,
+          "4": 0
+        },
+        "lift_nnz": 296,
+        "boundary_nnz": 4582
+      },
+      "dense_matrices": true,
+      "representatives_closed": true,
+      "index": 4,
+      "repetition": 0,
+      "source_log": "ablation.jsonl"
+    },
+    {
+      "family": "torus",
+      "n": 125,
+      "h": 3,
+      "field": "Q",
+      "side": 5,
+      "dimension": 3,
+      "engine": "morse_sparse",
+      "status": "ok",
+      "wall_seconds": 1.0199768000165932,
+      "peak_private_mib": 46.09375,
+      "peak_rss_mib": 57.26171875,
+      "seconds": 0.5828086000401527,
+      "graph_sha256": "ce8ad7324d196314a6433770fce74c7538da3bdfeefa19956796e300887994fe",
+      "edges": 375,
+      "formal_paths": [
+        125,
+        375,
+        1125,
+        3375,
+        10125
+      ],
+      "betti": {
+        "0": 1,
+        "1": 3,
+        "2": 3,
+        "3": 1,
+        "4": 0
+      },
+      "omega": {
+        "0": 125,
+        "1": 375,
+        "2": 375,
+        "3": 125,
+        "4": 0,
+        "5": 0
+      },
+      "cycles": {
+        "0": 125,
+        "1": 251,
+        "2": 127,
+        "3": 1,
+        "4": 0
+      },
+      "boundaries": {
+        "0": 124,
+        "1": 248,
+        "2": 124,
+        "3": 0,
+        "4": 0
+      },
+      "h_counts": {
+        "0": 1,
+        "1": 3,
+        "2": 3,
+        "3": 1,
+        "4": 0
+      },
+      "morse_stats": {
+        "pairs": 496,
+        "unit_pivots": 496,
+        "schur_updates": 1488,
+        "new_entries": 516,
+        "initial_nnz": 3000,
+        "critical_dimensions": {
+          "0": 1,
+          "1": 3,
+          "2": 3,
+          "3": 1,
+          "4": 0
+        },
+        "lift_nnz": 296,
+        "boundary_nnz": 4582
+      },
+      "dense_matrices": false,
+      "representatives_closed": true,
+      "index": 4,
+      "repetition": 0,
+      "source_log": "ablation.jsonl"
+    },
+    {
+      "family": "sparse",
+      "n": 500,
+      "h": 2,
+      "field": "Q",
+      "engine": "linear",
+      "status": "memory_limit",
+      "wall_seconds": 24.975800500018522,
+      "peak_private_mib": 1526.21875,
+      "peak_rss_mib": 1106.0625,
+      "seconds": null,
+      "graph_sha256": "d4bf752a47b014e153429ce7bd76a007a726cb1ac1db2f8d0359050033386c28",
+      "edges": 1500,
+      "formal_paths": [
+        500,
+        1500,
+        4500,
+        13500
+      ],
+      "index": 3,
+      "repetition": 0,
+      "source_log": "extended.jsonl"
+    },
+    {
+      "family": "sparse",
+      "n": 500,
+      "h": 2,
+      "field": "Q",
+      "engine": "morse",
+      "status": "ok",
+      "wall_seconds": 1.1965996000217274,
+      "peak_private_mib": 592.640625,
+      "peak_rss_mib": 603.18359375,
+      "seconds": 0.6407092999434099,
+      "graph_sha256": "d4bf752a47b014e153429ce7bd76a007a726cb1ac1db2f8d0359050033386c28",
+      "edges": 1500,
+      "formal_paths": [
+        500,
+        1500,
+        4500,
+        13500
+      ],
+      "betti": {
+        "0": 1,
+        "1": 957,
+        "2": 0,
+        "3": 0
+      },
+      "omega": {
+        "0": 500,
+        "1": 1500,
+        "2": 44,
+        "3": 0,
+        "4": 0
+      },
+      "cycles": {
+        "0": 500,
+        "1": 1001,
+        "2": 0,
+        "3": 0
+      },
+      "boundaries": {
+        "0": 499,
+        "1": 44,
+        "2": 0,
+        "3": 0
+      },
+      "h_counts": {
+        "0": 1,
+        "1": 957,
+        "2": 0,
+        "3": 0
+      },
+      "morse_stats": {
+        "pairs": 543,
+        "unit_pivots": 543,
+        "schur_updates": 3500,
+        "new_entries": 2499,
+        "initial_nnz": 3164,
+        "critical_dimensions": {
+          "0": 1,
+          "1": 957,
+          "2": 0,
+          "3": 0
+        },
+        "lift_nnz": 19609,
+        "boundary_nnz": 1162
+      },
+      "dense_matrices": true,
+      "representatives_closed": true,
+      "index": 3,
+      "repetition": 0,
+      "source_log": "extended.jsonl"
+    },
+    {
+      "family": "sparse",
+      "n": 500,
+      "h": 2,
+      "field": "Q",
+      "engine": "morse_sparse",
+      "status": "ok",
+      "wall_seconds": 0.9674042999977246,
+      "peak_private_mib": 69.03125,
+      "peak_rss_mib": 80.484375,
+      "seconds": 0.4965375000028871,
+      "graph_sha256": "d4bf752a47b014e153429ce7bd76a007a726cb1ac1db2f8d0359050033386c28",
+      "edges": 1500,
+      "formal_paths": [
+        500,
+        1500,
+        4500,
+        13500
+      ],
+      "betti": {
+        "0": 1,
+        "1": 957,
+        "2": 0,
+        "3": 0
+      },
+      "omega": {
+        "0": 500,
+        "1": 1500,
+        "2": 44,
+        "3": 0,
+        "4": 0
+      },
+      "cycles": {
+        "0": 500,
+        "1": 1001,
+        "2": 0,
+        "3": 0
+      },
+      "boundaries": {
+        "0": 499,
+        "1": 44,
+        "2": 0,
+        "3": 0
+      },
+      "h_counts": {
+        "0": 1,
+        "1": 957,
+        "2": 0,
+        "3": 0
+      },
+      "morse_stats": {
+        "pairs": 543,
+        "unit_pivots": 543,
+        "schur_updates": 3500,
+        "new_entries": 2499,
+        "initial_nnz": 3164,
+        "critical_dimensions": {
+          "0": 1,
+          "1": 957,
+          "2": 0,
+          "3": 0
+        },
+        "lift_nnz": 19609,
+        "boundary_nnz": 1162
+      },
+      "dense_matrices": false,
+      "representatives_closed": true,
+      "index": 3,
+      "repetition": 0,
+      "source_log": "extended.jsonl"
+    },
+    {
+      "family": "torus",
+      "n": 216,
+      "h": 3,
+      "field": 3,
+      "side": 6,
+      "dimension": 3,
+      "engine": "morse",
+      "status": "ok",
+      "wall_seconds": 1.7581122000119649,
+      "peak_private_mib": 972.48828125,
+      "peak_rss_mib": 981.62109375,
+      "seconds": 1.1861651000217535,
+      "graph_sha256": "dbaa508500df710bc8a60e2b4a01c6f0d29d7f7fc204d90751a87bf6a7c1f6d4",
+      "edges": 648,
+      "formal_paths": [
+        216,
+        648,
+        1944,
+        5832,
+        17496
+      ],
+      "betti": {
+        "0": 1,
+        "1": 3,
+        "2": 3,
+        "3": 1,
+        "4": 0
+      },
+      "omega": {
+        "0": 216,
+        "1": 648,
+        "2": 648,
+        "3": 216,
+        "4": 0,
+        "5": 0
+      },
+      "cycles": {
+        "0": 216,
+        "1": 433,
+        "2": 218,
+        "3": 1,
+        "4": 0
+      },
+      "boundaries": {
+        "0": 215,
+        "1": 430,
+        "2": 215,
+        "3": 0,
+        "4": 0
+      },
+      "h_counts": {
+        "0": 1,
+        "1": 3,
+        "2": 3,
+        "3": 1,
+        "4": 0
+      },
+      "morse_stats": {
+        "pairs": 860,
+        "unit_pivots": 860,
+        "schur_updates": 2580,
+        "new_entries": 858,
+        "initial_nnz": 5184,
+        "critical_dimensions": {
+          "0": 1,
+          "1": 3,
+          "2": 3,
+          "3": 1,
+          "4": 0
+        },
+        "lift_nnz": 453,
+        "boundary_nnz": 9292
+      },
+      "dense_matrices": true,
+      "representatives_closed": true,
+      "index": 5,
+      "repetition": 0,
+      "source_log": "field3.jsonl"
+    },
+    {
+      "family": "torus",
+      "n": 216,
+      "h": 3,
+      "field": 3,
+      "side": 6,
+      "dimension": 3,
+      "engine": "morse_sparse",
+      "status": "ok",
+      "wall_seconds": 1.2743125000270084,
+      "peak_private_mib": 92.63671875,
+      "peak_rss_mib": 103.84765625,
+      "seconds": 0.8203913000179455,
+      "graph_sha256": "dbaa508500df710bc8a60e2b4a01c6f0d29d7f7fc204d90751a87bf6a7c1f6d4",
+      "edges": 648,
+      "formal_paths": [
+        216,
+        648,
+        1944,
+        5832,
+        17496
+      ],
+      "betti": {
+        "0": 1,
+        "1": 3,
+        "2": 3,
+        "3": 1,
+        "4": 0
+      },
+      "omega": {
+        "0": 216,
+        "1": 648,
+        "2": 648,
+        "3": 216,
+        "4": 0,
+        "5": 0
+      },
+      "cycles": {
+        "0": 216,
+        "1": 433,
+        "2": 218,
+        "3": 1,
+        "4": 0
+      },
+      "boundaries": {
+        "0": 215,
+        "1": 430,
+        "2": 215,
+        "3": 0,
+        "4": 0
+      },
+      "h_counts": {
+        "0": 1,
+        "1": 3,
+        "2": 3,
+        "3": 1,
+        "4": 0
+      },
+      "morse_stats": {
+        "pairs": 860,
+        "unit_pivots": 860,
+        "schur_updates": 2580,
+        "new_entries": 858,
+        "initial_nnz": 5184,
+        "critical_dimensions": {
+          "0": 1,
+          "1": 3,
+          "2": 3,
+          "3": 1,
+          "4": 0
+        },
+        "lift_nnz": 453,
+        "boundary_nnz": 9292
+      },
+      "dense_matrices": false,
+      "representatives_closed": true,
+      "index": 5,
+      "repetition": 0,
+      "source_log": "field3.jsonl"
+    }
+  ]
+}

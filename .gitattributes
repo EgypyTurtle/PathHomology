@@ -1,0 +1,3 @@
+# Preserve exact bytes, including the frozen sources' historical SHA256 hashes.
+# Python accepts the existing LF/CRLF files on both Windows and Linux.
+* -text

@@ -46,3 +46,4 @@ for name, E, md, wantO, wantB in CASES:
     print(f"{name:<12} {str(bQ):<22} {str(b2):<22} {status}")
 
 print("\n" + ("ALL AGREE" if bad == 0 else f"{bad} MISMATCHES"))
+raise SystemExit(1 if bad else 0)

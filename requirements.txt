@@ -1,0 +1,2 @@
+# Version used for the published measurements and release checks.
+numpy==2.3.5

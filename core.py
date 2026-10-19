@@ -24,7 +24,7 @@ Main public entry point: :func:`path_homology`.
 
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import defaultdict, deque
 from fractions import Fraction
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
@@ -357,8 +357,17 @@ def _from_mod_array(values: np.ndarray, p: int) -> np.ndarray:
     """Convert an integer residue matrix back to the public GF object form."""
     out = np.empty(values.shape, dtype=object)
     src, dst = values.ravel(), out.ravel()
+    if p <= 257:
+        # Field scalars, like the zero and one in _field_eye, can be shared.
+        # In GF(2) this avoids allocating one Python object per matrix entry.
+        scalars = tuple(GF(value, p) for value in range(p))
+        for i, x in enumerate(src):
+            dst[i] = scalars[int(x) % p]
+        return out
+    zero, one = GF(0, p), GF(1, p)
     for i, x in enumerate(src):
-        dst[i] = GF(int(x), p)
+        value = int(x) % p
+        dst[i] = zero if value == 0 else one if value == 1 else GF(value, p)
     return out
 
 
@@ -400,8 +409,10 @@ def _integral_int64(mat: np.ndarray):
 def _from_integer_array(values: np.ndarray) -> np.ndarray:
     out = np.empty(values.shape, dtype=object)
     src, dst = values.ravel(), out.ravel()
+    common = {0: Fraction(0), 1: Fraction(1), -1: Fraction(-1)}
     for i, x in enumerate(src):
-        dst[i] = Fraction(int(x))
+        value = int(x)
+        dst[i] = common[value] if value in common else Fraction(value)
     return out
 
 
@@ -1035,12 +1046,14 @@ def allowed_paths(
         if loops or u != v:
             adj_sets[u].add(v)
 
-    adj = {u: tuple(vs) for u, vs in adj_sets.items()}
+    adj = {u: tuple(sorted(vs)) for u, vs in adj_sets.items()}
 
     if max_dim is None:
         max_dim = DEFAULT_MAX_DIM
 
-    paths: Dict[int, List[Path]] = {0: [(v,) for v in labels]}
+    # Lexicographic prefixes followed by sorted neighbors already produce the
+    # next lexicographic degree; sorting every generated path list is redundant.
+    paths: Dict[int, List[Path]] = {0: [(v,) for v in sorted(labels)]}
     dim = 0
     while paths[dim] and dim < max_dim:
         nxt: List[Path] = []
@@ -1052,8 +1065,6 @@ def allowed_paths(
         dim += 1
         paths[dim] = nxt
     paths = {p: v for p, v in paths.items() if v}
-    for p in paths:
-        paths[p] = sorted(paths[p], key=lambda t: (len(t), t))
     return paths
 
 
@@ -1179,6 +1190,34 @@ def _gf2_boundary_bitrows(paths_p: Sequence[Path], *, regular: bool = False):
     return rows
 
 
+def _gf2_closed_boundary_rank(paths_p, paths_previous, *, regular=False):
+    """Stream sparse boundary columns instead of allocating very wide bit rows.
+
+    For a boundary-closed allowed space each column has at most p+1 nonzeros.
+    Highest-face pivots keep simplex-like boundary matrices particularly sparse.
+    Only independent pivot columns are retained.
+    """
+    index = {path: i for i, path in enumerate(paths_previous)}
+    pivots = {}
+    for path in paths_p:
+        column = set()
+        for face, coefficient in boundary_of_path(path, regular=regular):
+            if coefficient & 1:
+                row = index[face]
+                if row in column:
+                    column.remove(row)
+                else:
+                    column.add(row)
+        while column:
+            pivot = max(column)
+            previous = pivots.get(pivot)
+            if previous is None:
+                pivots[pivot] = column
+                break
+            column.symmetric_difference_update(previous)
+    return len(pivots)
+
+
 def _primitive_sparse_row(row: Dict[int, int]) -> Dict[int, int]:
     import math
 
@@ -1193,9 +1232,177 @@ def _primitive_sparse_row(row: Dict[int, int]) -> Dict[int, int]:
     return row
 
 
+def _peel_sparse_rows(rows, kind: str, modulus=None):
+    """Remove singleton row/column pivots without any fill-in.
+
+    Every removed nonzero pivot adds exactly one to the rank over the chosen
+    field. Only the remaining core needs Gaussian elimination. Inputs are not
+    mutated; zeros modulo p are removed before degrees are measured.
+    """
+    if kind == "GF":
+        work = [{c: v % modulus for c, v in row.items() if v % modulus}
+                for row in rows]
+    else:
+        work = [{c: v for c, v in row.items() if v} for row in rows]
+    incidence = defaultdict(set)
+    queue = deque()
+    for i, row in enumerate(work):
+        if len(row) == 1:
+            queue.append((i, next(iter(row))))
+        for column in row:
+            incidence[column].add(i)
+    for column, neighbors in incidence.items():
+        if len(neighbors) == 1:
+            queue.append((next(iter(neighbors)), column))
+    rank = 0
+    while queue:
+        i, column = queue.popleft()
+        row = work[i]
+        neighbors = incidence.get(column)
+        if column not in row or not neighbors:
+            continue
+        if len(row) != 1 and len(neighbors) != 1:
+            continue
+        rank += 1
+        # Remove the pivot row from every other column's incidence list.
+        for other_column in row:
+            other_neighbors = incidence[other_column]
+            other_neighbors.discard(i)
+            if len(other_neighbors) == 1:
+                queue.append((next(iter(other_neighbors)), other_column))
+        row.clear()
+        # A singleton row clears its column without changing other entries.
+        # For a singleton column there are no other entries to clear.
+        for other_i in tuple(neighbors):
+            other_row = work[other_i]
+            other_row.pop(column, None)
+            if len(other_row) == 1:
+                queue.append((other_i, next(iter(other_row))))
+        neighbors.clear()
+    residual = [row for row in work if row]
+    if not residual:
+        return rank, [], 0
+    columns = {c: j for j, c in enumerate(sorted({c for r in residual for c in r}))}
+    return rank, [{columns[c]: v for c, v in row.items()} for row in residual], len(columns)
+
+
 def _sparse_rank(rows, n_cols: int, kind: str, modulus=None) -> int:
+    """Sparse rank with fill-free preprocessing for exact sparse dictionaries."""
+    rows = list(rows)
+    if len(rows) >= 32 and rows and not isinstance(rows[0], int) and kind != "R":
+        offset, residual, remaining = _peel_sparse_rows(rows, kind, modulus)
+        blocks = _sparse_row_blocks(residual, remaining) if len(residual) >= 256 else [(residual, remaining)]
+        return offset + sum(_sparse_rank_raw(block, width, kind, modulus)
+                            for block, width in blocks)
+    return _sparse_rank_raw(rows, n_cols, kind, modulus)
+
+
+def _sparse_row_blocks(rows, n_cols):
+    """Independent row/column incidence components (not graph SCCs).
+
+    Row and column permutations make these diagonal blocks, so their ranks
+    add over every field. Empty rows and unused columns have rank zero.
+    """
+    rows = [row for row in rows if row]
+    if len(rows) < 2:
+        return [(rows, n_cols)]
+    parent = list(range(len(rows)))
+    size = [1] * len(rows)
+    owner = {}
+
+    def find(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    for i, row in enumerate(rows):
+        for column in row:
+            previous = owner.setdefault(column, i)
+            a, b = find(i), find(previous)
+            if a != b:
+                if size[a] < size[b]:
+                    a, b = b, a
+                parent[b] = a
+                size[a] += size[b]
+    groups = defaultdict(list)
+    for i, row in enumerate(rows):
+        groups[find(i)].append(row)
+    if len(groups) == 1:
+        return [(rows, n_cols)]
+    blocks = []
+    for block in groups.values():
+        columns = {c: j for j, c in enumerate(sorted({c for row in block for c in row}))}
+        blocks.append(([{columns[c]: v for c, v in row.items()} for row in block], len(columns)))
+    return blocks
+
+
+def _sparsity_order_rows(rows):
+    """Static low-degree columns and short rows; a rank-only permutation.
+
+    This is a cheap fill-reduction heuristic, not dynamic Markowitz pivoting.
+    It never changes canonical kernel bases because it is used only for rank.
+    """
+    degrees = defaultdict(int)
+    for row in rows:
+        for c in row:
+            degrees[c] += 1
+    order = {c: j for j, c in enumerate(sorted(degrees, key=lambda c: (degrees[c], c)))}
+    return [{order[c]: v for c, v in row.items()} for row in sorted(rows, key=len)]
+
+
+def _gf2_sparse_column_rank(rows, n_cols):
+    """Transpose a very wide, low-column-degree matrix before sparse XOR.
+
+    Unlike packed rows, a two-entry column does not allocate a bit string as
+    wide as all allowed paths. Only independent reduced columns are retained.
+    """
+    # Highest-row pivots now prefer low-degree constraint rows. This static
+    # row permutation avoids spending short columns on dense allowed faces.
+    rows = sorted(rows, key=len, reverse=True)
+    columns = [None] * n_cols
+    for i, row in enumerate(rows):
+        for c, value in row.items():
+            if value & 1:
+                if columns[c] is None:
+                    columns[c] = [i]
+                else:
+                    columns[c].append(i)
+    pivots = {}
+    for j, source in enumerate(columns):
+        if source is None:
+            continue
+        column = set(source)
+        columns[j] = None
+        while column:
+            # Sets are efficient for very sparse columns; packed bits win
+            # after fill-in. Keep the conversion local rather than densifying
+            # every short pivot column preemptively.
+            if isinstance(column, set) and len(column) > 64:
+                column = sum(1 << i for i in column)
+            pivot = max(column) if isinstance(column, set) else column.bit_length() - 1
+            previous = pivots.get(pivot)
+            if previous is None:
+                pivots[pivot] = column
+                break
+            if isinstance(column, set) and isinstance(previous, set):
+                column.symmetric_difference_update(previous)
+            else:
+                if isinstance(column, set):
+                    column = sum(1 << i for i in column)
+                if isinstance(previous, set):
+                    previous = sum(1 << i for i in previous)
+                column ^= previous
+    return len(pivots)
+
+
+def _sparse_rank_raw(rows, n_cols: int, kind: str, modulus=None) -> int:
     """Rank from sparse integer rows over Q, GF(p), or floating point."""
     if kind == "GF" and modulus == 2:
+        rows = list(rows)
+        if (n_cols >= 150000 and rows and not isinstance(rows[0], int)
+                and sum(map(len, rows)) <= 8 * n_cols):
+            return _gf2_sparse_column_rank(rows, n_cols)
         pivots: Dict[int, int] = {}
         for source in rows:
             if isinstance(source, int):
@@ -1240,6 +1447,9 @@ def _sparse_rank(rows, n_cols: int, kind: str, modulus=None) -> int:
     if kind == "Q":
         import math
 
+        rows = list(rows)
+        if len(rows) >= 64 and any(len(row) > 12 for row in rows):
+            rows = _sparsity_order_rows(rows)
         pivots: Dict[int, Dict[int, int]] = {}
         for source in rows:
             row = _primitive_sparse_row(dict(source))
@@ -1291,7 +1501,7 @@ def _sparse_rank(rows, n_cols: int, kind: str, modulus=None) -> int:
 
 
 def _q_sparse_rank_certified(rows, n_cols: int, upper_bound=None) -> int:
-    """Exact sparse rank over Q, with a cheap characteristic-two certificate.
+    """Exact sparse Q rank with peeling, blocks and multi-prime certificates.
 
     Reduction modulo two can only decrease the rank of an integer matrix.  If
     that lower bound reaches a proven upper bound, the rational rank is known
@@ -1305,10 +1515,28 @@ def _q_sparse_rank_certified(rows, n_cols: int, upper_bound=None) -> int:
     upper = min(len(materialized), n_cols)
     if upper_bound is not None:
         upper = min(upper, int(upper_bound))
-    lower = _sparse_rank(materialized, n_cols, "GF", 2)
-    if lower == upper:
-        return lower
-    return _sparse_rank(materialized, n_cols, "Q")
+    if len(materialized) >= 32:
+        offset, residual, remaining = _peel_sparse_rows(materialized, "Q")
+    else:
+        offset, residual, remaining = 0, materialized, n_cols
+    if not residual:
+        return offset
+    blocks = _sparse_row_blocks(residual, remaining) if len(residual) >= 128 else [(residual, remaining)]
+    total = offset
+    for block, width in blocks:
+        block_upper = min(len(block), width, upper - total)
+        lower = _sparse_rank_raw(block, width, "GF", 2)
+        if lower != block_upper:
+            odd = _sparse_rank_raw(block, width, "GF", 65521)
+            if odd > lower and odd != block_upper:
+                odd = max(odd, _sparse_rank_raw(block, width, "GF", 65519))
+            lower = max(lower, odd)
+        if lower == block_upper:
+            total += lower
+        else:
+            # Repeated agreeing modular ranks are not a certificate.
+            total += _sparse_rank_raw(block, width, "Q")
+    return total
 
 
 def _incidence_rank(paths_0: Sequence[Path], paths_1: Sequence[Path]) -> int:
@@ -1335,6 +1563,166 @@ def _incidence_rank(paths_0: Sequence[Path], paths_1: Sequence[Path]) -> int:
             parent[root_target] = root_source
     components = len({find(vertex) for vertex in vertices})
     return len(vertices) - components
+
+
+def _sparse_path_ranks(paths, edges, degree, kind, modulus, method, regular,
+                       previous_cycle_dimension, complete_previous=True,
+                       boundary_rows=None):
+    """Ranks of bad faces and the full boundary in one allowed-path degree."""
+    if degree == 0:
+        return 0, 0
+    if degree == 1:
+        return 0, _incidence_rank(paths[0], paths[1])
+    current = paths[degree]
+    previous = paths.get(degree - 1, [])
+    n_paths = len(current)
+    full_rows = (boundary_rows if boundary_rows is not None else
+                 _sparse_boundary_rows(current, regular=regular))
+    if complete_previous:
+        allowed_previous = set(previous)
+        condition_rows = [row for face, row in full_rows.items()
+                          if face not in allowed_previous and row]
+    else:
+        edge_set = set(edges)
+        condition_rows = [row for face, row in full_rows.items() if row and
+                          any(pair not in edge_set for pair in zip(face, face[1:]))]
+    boundary_closed = not condition_rows
+    if method in ("auto", "kernel"):
+        condition_rank = (
+            _q_sparse_rank_certified(condition_rows, n_paths) if kind == "Q"
+            else _sparse_rank(condition_rows, n_paths, kind, modulus)
+        )
+    else:
+        conditions = _omega_conditions(
+            paths, edges, degree, kind, modulus, method=method, regular=regular,
+        )
+        condition_rank = _rank(conditions) if conditions.size else 0
+    if condition_rank == n_paths:
+        return condition_rank, n_paths
+    if boundary_closed and complete_previous and (kind == "Q" or (kind == "GF" and modulus == 2)):
+        # Transpose the elimination: boundary columns have <= degree+1 terms,
+        # whereas a packed row can occupy O(|A_degree|) bits even when sparse.
+        modular_rank = (
+            _sparse_rank_raw(full_rows.values(), n_paths, "GF", 2)
+            if n_paths <= 10_000 else
+            _gf2_closed_boundary_rank(current, previous, regular=regular)
+        )
+        upper = min(n_paths, previous_cycle_dimension)
+        if kind == "GF" or modular_rank == upper:
+            return condition_rank, modular_rank
+        return condition_rank, _q_sparse_rank_certified(full_rows.values(), n_paths, upper)
+    if kind == "Q":
+        # rank(F)=rank(C)+rank(F|ker C), and boundary(Omega_p) lies in
+        # Z_(p-1). This upper bound is valid also after support pruning.
+        upper = min(n_paths, condition_rank + previous_cycle_dimension)
+        return condition_rank, _q_sparse_rank_certified(full_rows.values(), n_paths, upper)
+    return condition_rank, _sparse_rank(full_rows.values(), n_paths, kind, modulus)
+
+
+def _prune_omega_singletons(paths_p, edges, regular, kind, modulus=None):
+    """Propagate forced-zero variables of bad-face equations to a fixed point.
+
+    Only singleton ROWS force a variable to zero; singleton columns do not.
+    Returned rows have compacted surviving columns and can be reused for ranks.
+    This is a conservative support superset, not a new Omega basis algorithm.
+    """
+    full_rows = _sparse_boundary_rows(paths_p, regular=regular)
+    edge_set = edges if isinstance(edges, set) else set(edges)
+    constraints = []
+    incidence = defaultdict(list)
+    queue = deque()
+    for face, row in full_rows.items():
+        if not any(pair not in edge_set for pair in zip(face, face[1:])):
+            continue
+        columns = [c for c, value in row.items()
+                   if value and (kind != "GF" or value % modulus)]
+        if not columns:
+            continue
+        i = len(constraints)
+        constraints.append(columns)
+        for c in columns:
+            incidence[c].append(i)
+        if len(columns) == 1:
+            queue.append(columns[0])
+    active = bytearray([1]) * len(paths_p)
+    sizes = [len(columns) for columns in constraints]
+    removed = 0
+    while queue:
+        c = queue.popleft()
+        if not active[c]:
+            continue
+        active[c] = 0
+        removed += 1
+        for i in incidence[c]:
+            sizes[i] -= 1
+            if sizes[i] == 1:
+                queue.append(next(j for j in constraints[i] if active[j]))
+    if not removed:
+        return paths_p, full_rows, 0
+    del constraints, incidence, sizes, queue
+    kept = [c for c, alive in enumerate(active) if alive]
+    positions = {c: j for j, c in enumerate(kept)}
+    # Replace rows one at a time, rather than retaining two large matrices
+    # during compaction. Tuple keys and all surviving coefficients are shared.
+    for face in list(full_rows):
+        row = full_rows[face]
+        row = {positions[c]: v for c, v in row.items() if active[c]}
+        if row:
+            full_rows[face] = row
+        else:
+            del full_rows[face]
+    return [paths_p[c] for c in kept], full_rows, removed
+
+
+def _omega2_support(paths_2, edges, regular):
+    """Exact set of 2-paths which can occur in an Omega_2 chain, loopless case.
+
+    Each bad endpoint pair gives one equation with disjoint support. A lone
+    bridge is forced to zero; a group with >=2 bridges permits every variable.
+    Triangles have no bad-face constraint. In the regular complex a repeated
+    endpoint face is dropped and imposes no constraint either.
+    """
+    edge_set = set(edges)
+    multiplicity = defaultdict(int)
+    for a, _, c in paths_2:
+        if (a, c) not in edge_set and not (regular and a == c):
+            multiplicity[a, c] += 1
+    return [path for path in paths_2
+            if (path[0], path[2]) in edge_set
+            or (regular and path[0] == path[2])
+            or multiplicity[path[0], path[2]] >= 2]
+
+
+def _supported_omega_basis(paths_p, candidates, edges, kind, modulus, regular):
+    """Canonical kernel on conservatively supported columns, lifted to A_p.
+
+    This remains the constraint-kernel algorithm, not inductive chain generation
+    or Morse reduction. All exposed coefficient vectors retain original length.
+    """
+    if not candidates:
+        return [], 0
+    candidates, rows, removed = _prune_omega_singletons(
+        candidates, edges, regular, kind, modulus,
+    )
+    if not candidates:
+        return [], removed
+    bad_faces = sorted(face for face, row in rows.items() if row and
+                       any(pair not in edges for pair in zip(face, face[1:])))
+    if bad_faces:
+        conditions = _field_zeros((len(bad_faces), len(candidates)), kind, modulus)
+        for i, face in enumerate(bad_faces):
+            for j, value in rows[face].items():
+                conditions[i, j] = make_scalar(value, kind, modulus)
+        basis = _nullspace(conditions)
+    else:
+        basis = _field_eye(len(candidates), kind, modulus)
+    if len(candidates) == len(paths_p):
+        return _columns(basis), removed
+    positions = {path: j for j, path in enumerate(paths_p)}
+    lifted = _field_zeros((len(paths_p), basis.shape[1]), kind, modulus)
+    for j, path in enumerate(candidates):
+        lifted[positions[path], :] = basis[j, :]
+    return _columns(lifted), removed
 
 
 # ---------------------------------------------------------------------------
@@ -1697,7 +2085,15 @@ class PathHomologyResult:
         self.generators_materialized: bool = True
         #: whether dense boundary matrices are present in boundary_matrices
         self.matrices_materialized: bool = True
+        #: whether elementary allowed paths were retained (streaming mode: False)
+        self.paths_materialized: bool = True
         self.allowed: Dict[int, List[Path]] = {}
+        self.dim_allowed: Dict[int, int] = {}
+        #: first degree skipped after an exact Omega_(p-1)=0 certificate
+        self.pruned_from_dimension: Optional[int] = None
+        #: Actual sparse candidates, distinct from exact formal A_p counts.
+        self.candidate_counts: Dict[int, int] = {}
+        self.support_pruning: Dict[int, dict] = {}
         self.boundary_matrices: Dict[int, np.ndarray] = {}
         self.omega_basis: Dict[int, List[np.ndarray]] = {}
         self.omega_matrix: Dict[int, np.ndarray] = {}
@@ -1710,6 +2106,9 @@ class PathHomologyResult:
         self.dim_cycles: Dict[int, int] = {}
         self.dim_boundaries: Dict[int, int] = {}
         self.euler_characteristic: Optional[int] = None
+        #: Linear (legacy canonical representatives) or exact Morse reduction.
+        self.homology_method: str = "linear"
+        self.morse_stats: dict = {}
 
     # -- pretty printing ---------------------------------------------------
 
@@ -1739,13 +2138,19 @@ class PathHomologyResult:
         lines.append("=" * 72)
         lines.append(f"  |V| = {len(self.vertices)}, |E| = {len(self.edges)}")
         lines.append(f"  coefficient field K = {self.field}")
-        dim_max = max(self.allowed) if self.allowed else -1
+        if self.homology_method == "morse":
+            lines.append("  homology backend = exact algebraic Morse cancellation")
+        dimensions = self.dim_allowed or {p: len(v) for p, v in self.allowed.items()}
+        dim_max = max(dimensions) if dimensions else -1
         lines.append(f"  max dimension with A_p != 0 : p = {dim_max}")
         lines.append("")
         lines.append("-- Allowed paths  A_p (Section 3.2 / Example 3.3) --")
-        for p in sorted(self.allowed):
-            dim_a = len(self.allowed[p])
+        for p in sorted(dimensions):
+            dim_a = dimensions[p]
             lines.append(f"  A_{p} : dim = {dim_a}")
+            if not self.paths_materialized:
+                lines.append("        paths not retained (streaming mode)")
+                continue
             shown = self.allowed[p][:12]
             txt = ", ".join("".join(str(x) for x in t) for t in shown)
             if len(self.allowed[p]) > len(shown):
@@ -1764,7 +2169,7 @@ class PathHomologyResult:
         lines.append("-- Omega_p = {v in A_p : partial v in A_(p-1)}  (3.8) --")
         for p in sorted(self.dim_omega):
             lines.append(
-                f"  Omega_{p} : dim A_{p} = {len(self.allowed.get(p, []))}"
+                f"  Omega_{p} : dim A_{p} = {dimensions.get(p, 0)}"
                 f"   dim Omega_{p} = {self.dim_omega[p]}"
             )
         lines.append("")
@@ -1950,6 +2355,192 @@ def _vec_to_dict(vec: np.ndarray, basis: Sequence[Path]) -> Dict[Path, Scalar]:
     return out
 
 
+def _stream_path_dimensions(res, vertices, edges, max_dim, kind, modulus,
+                            method, regular, verbose):
+    """Keep only consecutive allowed-path degrees; prune a proved zero tail.
+
+    For a loopless digraph, grouping a chain by its last vertex shows that all
+    its prefixes lie in Omega_(p-1). Thus Omega_(p-1)=0 implies Omega_p=0.
+    After this certificate, only endpoint walk counts (dynamic programming)
+    are needed. Approximate R ranks never activate this exact-zero inference.
+    """
+    initial = allowed_paths(vertices, edges, max_dim=0)
+    current = initial.get(0, [])
+    labels = [v for (v,) in current]
+    res.vertices = labels
+    adjacency_sets = defaultdict(set)
+    for u, v in edges:
+        adjacency_sets[u].add(v)
+    adjacency = {u: tuple(sorted(vs)) for u, vs in adjacency_sets.items()}
+    counts = dict.fromkeys(labels, 1)
+    previous = []
+    degree = 0
+    limit = DEFAULT_MAX_DIM if max_dim is None else max(0, max_dim)
+    zero_tail = False
+    can_prune = kind != "R" and all(u != v for u, v in edges) and method in ("auto", "kernel")
+    edge_set = set(edges)
+    suffix_rejected = 0
+    while counts and degree <= limit:
+        n_paths = sum(counts.values())
+        if not n_paths:
+            break
+        res.dim_allowed[degree] = n_paths
+        entered_zero_tail = zero_tail
+        if zero_tail:
+            dim_omega = dim_cycles = 0
+        else:
+            boundary_rows = None
+            singleton_removed = 0
+            if can_prune and degree == 2:
+                # A forced-zero prefix can never occur in a higher Omega chain.
+                # Filter these prefixes before extending them into degree 3.
+                support = _omega2_support(current, edges, regular)
+                singleton_removed = len(current) - len(support)
+                current = support
+            elif (can_prune and degree >= 3 and
+                  res.dim_omega.get(2) != res.dim_allowed.get(2)):
+                current, boundary_rows, singleton_removed = _prune_omega_singletons(
+                    current, edge_set, regular, kind, modulus,
+                )
+            window = {degree: current}
+            if degree:
+                window[degree - 1] = previous
+            condition_rank, full_rank = _sparse_path_ranks(
+                window, edges, degree, kind, modulus, method, regular,
+                res.dim_cycles.get(degree - 1, 0),
+                complete_previous=(degree == 0 or len(previous) == res.dim_allowed.get(degree - 1, 0)),
+                boundary_rows=boundary_rows,
+            )
+            dim_omega = len(current) - condition_rank
+            dim_cycles = len(current) - full_rank
+            if can_prune and degree >= 2 and dim_omega == 0:
+                zero_tail = True
+                res.pruned_from_dimension = degree + 1
+                if verbose:
+                    print(f"[path_homology] Omega_{degree}=0; later degrees use walk counts only")
+            res.support_pruning[degree] = dict(singleton_removed=singleton_removed,
+                                               suffix_rejected=suffix_rejected)
+        res.candidate_counts[degree] = len(current) if not entered_zero_tail else 0
+        res.dim_omega[degree] = dim_omega
+        res.dim_cycles[degree] = dim_cycles
+        for output in (res.omega_basis, res.omega_paths, res.cycles,
+                       res.boundaries, res.homology_basis):
+            output[degree] = []
+        res.omega_matrix[degree] = _field_zeros((0, 0), kind, modulus)
+        if degree == limit:
+            break
+        next_counts = defaultdict(int)
+        for u, number in counts.items():
+            for v in adjacency.get(u, ()):
+                next_counts[v] += number
+        counts = next_counts
+        if zero_tail:
+            previous = current = []
+        else:
+            support = set(current) if can_prune and degree >= 2 and len(current) < n_paths else None
+            next_paths = []
+            suffix_rejected = 0
+            for path in current:
+                for v in adjacency.get(path[-1], ()):
+                    if support is not None and path[1:] + (v,) not in support:
+                        suffix_rejected += 1
+                        continue
+                    next_paths.append(path + (v,))
+            previous, current = current, next_paths
+        degree += 1
+    dim_max = max(res.dim_allowed, default=0)
+    res.dim_omega[dim_max + 1] = 0
+    res.omega_matrix[dim_max + 1] = _field_zeros((0, 0), kind, modulus)
+    for p in range(dim_max + 1):
+        res.dim_boundaries[p] = (res.dim_omega[p + 1] - res.dim_cycles[p + 1]
+                                 if p < dim_max else 0)
+        res.betti[p] = res.dim_cycles.get(p, 0) - res.dim_boundaries[p]
+    res.euler_characteristic = sum((-1) ** p * v for p, v in res.dim_omega.items())
+    return res
+
+
+def _morse_path_result(res, dim_max, kind, modulus, regular, verbose):
+    """Build d on Omega sparsely, cancel it, and lift all output chains.
+
+    This route does not multiply dense object boundary matrices. Omega bases
+    are the SAME ones computed by the legacy route, not elementary allowed
+    paths incorrectly regarded as a boundary-invariant complex.
+    """
+    try:
+        from .morse import Arithmetic, reduce_complex
+    except ImportError:
+        from morse import Arithmetic, reduce_complex
+    arithmetic = Arithmetic(modulus)
+    omega = {p: [{path: arithmetic.scalar(c) for path, c in vector.items()}
+                 for vector in res.omega_paths[p]] for p in range(dim_max + 1)}
+    differentials = {}
+    for p in range(1, dim_max + 1):
+        if not omega[p]:
+            differentials[p] = []
+            continue
+        # A canonical nullspace basis has identity rows on its free variables.
+        # Find those rows from nonzeros, not an O(dim A * dim Omega) scan.
+        owners = {}
+        for j, vector in enumerate(omega[p - 1]):
+            for path, value in vector.items():
+                owners[path] = (j, value) if path not in owners else None
+        coordinate_paths = [None] * len(omega[p - 1])
+        for path, owner in owners.items():
+            if owner is not None and owner[1] == 1:
+                coordinate_paths[owner[0]] = path
+        canonical = all(path is not None for path in coordinate_paths)
+        coordinate_index = {path: j for j, path in enumerate(coordinate_paths)}
+        allowed_previous = set(res.allowed[p - 1])
+        cols = []
+        for vector in omega[p]:
+            image = {}
+            for path, coefficient in vector.items():
+                for face, sign in boundary_of_path(path, regular=regular):
+                    arithmetic.axpy(image, {face: sign}, coefficient)
+            if not image.keys() <= allowed_previous:
+                raise AssertionError("Omega basis is not boundary-invariant")
+            if canonical:
+                col = {coordinate_index[path]: value for path, value in image.items()
+                       if path in coordinate_index}
+            else:
+                # Noncanonical user/alternative bases: use the existing exact
+                # solve rather than silently assuming an identity submatrix.
+                target = _field_zeros((len(res.allowed[p - 1]), 1), kind, modulus)
+                for r, path in enumerate(res.allowed[p - 1]):
+                    if path in image:
+                        target[r, 0] = make_scalar(image[path], kind, modulus)
+                solved = _solve_in_basis(res.omega_matrix[p - 1], target)
+                col = {r: arithmetic.scalar(solved[r, 0]) for r in range(solved.shape[0])
+                       if solved[r, 0] != 0}
+            cols.append(col)
+        differentials[p] = cols
+    reduced = reduce_complex({p: res.dim_omega[p] for p in range(dim_max + 1)},
+                             differentials, modulus=modulus)
+
+    def expand(vector, p):
+        chain = {}
+        for j, coefficient in vector.items():
+            arithmetic.axpy(chain, omega[p][j], coefficient)
+        return {path: make_scalar(c, kind, modulus) for path, c in chain.items()}
+
+    for p in range(dim_max + 1):
+        res.homology_basis[p] = [expand(v, p) for v in reduced["homology"][p]]
+        res.boundaries[p] = [expand(v, p) for v in reduced["boundaries"][p]]
+        res.cycles[p] = res.boundaries[p] + res.homology_basis[p]
+        res.dim_cycles[p] = res.dim_omega[p] - reduced["ranks"][p]
+        res.dim_boundaries[p] = reduced["ranks"].get(p + 1, 0)
+        res.betti[p] = len(res.homology_basis[p])
+        assert len(res.cycles[p]) == res.dim_cycles[p]
+        assert len(res.boundaries[p]) == res.dim_boundaries[p]
+        assert res.betti[p] == res.dim_cycles[p] - res.dim_boundaries[p]
+    res.morse_stats = reduced["stats"]
+    res.euler_characteristic = sum((-1) ** p * res.dim_omega[p]
+                                   for p in range(dim_max + 1))
+    if verbose:
+        print(f"[path_homology/morse] {res.morse_stats}; betti={res.betti}")
+    return res
+
+
 def path_homology(
     vertices: Optional[Iterable] = None,
     edges: Optional[Iterable[Tuple]] = None,
@@ -1960,8 +2551,10 @@ def path_homology(
     exact: bool = True,
     field=None,
     method: str = "auto",
+    homology_method: str = "linear",
     generators: bool = True,
     store_matrices: Optional[bool] = None,
+    store_paths: bool = True,
     verbose: bool = False,
 ) -> PathHomologyResult:
     """
@@ -2003,6 +2596,14 @@ def path_homology(
         Betti numbers can in principle depend on the characteristic.
     method : {"auto", "kernel", "lemma41", "prop42"}
         How ``Omega_p`` is obtained; see :func:`omega_basis`.
+    homology_method : {"linear", "morse"}, default "linear"
+        Keep the legacy linear-algebra backend, or cancel exact pairs on the
+        based chain complex Omega_*. Morse requires generators=True and Q or
+        a prime field; it also permits store_matrices=False (recommended).
+        Omega bases stay unchanged; cycle/boundary/homology bases may differ
+        but are lifted to ORIGINAL allowed-path coordinates. Morse boundaries
+        form an independent basis, rather than the legacy redundant columns.
+        This does NOT define a persistent or isospectral Laplacian reduction.
     generators : bool, default True
         When ``True``, materialise bases and representative chains for Omega,
         cycles, boundaries and homology.  When ``False``, compute only their
@@ -2014,6 +2615,14 @@ def path_homology(
         ``generators``: full computations keep them, while dimensions-only
         computations use sparse rows and do not materialise them.  Pass
         ``True`` with ``generators=False`` when matrix output is still wanted.
+        With homology_method="morse", False is also allowed with generators=True;
+        only the extra dense allowed-path boundary matrices are omitted.
+    store_paths : bool, default True
+        Retain all allowed elementary paths. Set False together with
+        generators=False and store_matrices=False for streaming dimensions.
+        Then result.allowed is empty, result.dim_allowed holds exact counts,
+        and a proved zero Omega tail can skip further enumeration (loopless
+        graphs, exact fields, methods auto/kernel).
     verbose : bool
         Print progress.
 
@@ -2045,22 +2654,41 @@ def path_homology(
     kind, modulus = resolve_field(field) if field is not None else (
         ("Q", None) if exact else ("R", None)
     )
+    if homology_method not in ("linear", "morse"):
+        raise ValueError("homology_method must be 'linear' or 'morse'")
+    if homology_method == "morse" and (kind == "R" or not generators):
+        raise ValueError("Morse requires an exact field (Q or GF(p)) and generators=True; "
+                         "use the existing sparse rank route for dimensions only")
     if store_matrices is None:
         store_matrices = generators
-    if generators and not store_matrices:
+    if generators and not store_matrices and homology_method != "morse":
         raise ValueError("generators=True requires store_matrices=True")
+    if not store_paths and (generators or store_matrices):
+        raise ValueError("store_paths=False requires generators=False and store_matrices=False")
+    vertices = list(vertices) if vertices is not None else None
+    edges = list(edges) if edges is not None else []
     res = PathHomologyResult(vertices or [], edges or [])
     res.field = "Q" if kind == "Q" else (f"GF({modulus})" if kind == "GF" else "R")
+    res.homology_method = homology_method
     res.generators_materialized = generators
     res.matrices_materialized = store_matrices
+    res.paths_materialized = store_paths
     # When loops are disabled the self-loops are removed from the edge relation
     # itself, so every downstream step (semi-edges, bridges, ambient paths) sees
     # the loopless digraph.
     edge_list = [(u, v) for (u, v) in (edges or ()) if loops or u != v]
     res.edges = edge_list
 
+    if not store_paths:
+        return _stream_path_dimensions(
+            res, vertices, edge_list, max_dim, kind, modulus, method, regular, verbose,
+        )
+
     paths = allowed_paths(vertices, edge_list, max_dim=max_dim, loops=loops)
+    if not paths:
+        paths = {0: []}  # the empty graph has a zero (not missing) C_0
     res.allowed = paths
+    res.dim_allowed = {p: len(v) for p, v in paths.items()}
     if vertices is None:
         res.vertices = [v for (v,) in paths[0]]
     else:
@@ -2084,72 +2712,48 @@ def path_homology(
         # Fully sparse dimensions-only route.  Each row is a dictionary of its
         # nonzero columns; over GF(2) it is immediately packed into one Python
         # integer and eliminated with machine-level big-integer XOR.
+        can_prune = (kind != "R" and method in ("auto", "kernel")
+                     and all(u != v for u, v in edge_list))
+        edge_set = set(edge_list)
+        previous_candidates = None
         for p in range(0, dim_max + 1):
-            n_paths = len(paths[p])
-            if p == 0:
-                condition_rank = 0
-                full_rank = 0
-            else:
-                # Direct packed-row construction wins while each row is a
-                # modest-size integer.  For very wide matrices, repeatedly
-                # XOR-growing those integers copies more memory than building
-                # sparse dictionaries once and packing them at elimination.
-                if kind == "GF" and modulus == 2 and n_paths <= 10_000:
-                    full_rows = _gf2_boundary_bitrows(
-                        paths[p], regular=regular
-                    )
-                else:
-                    full_rows = _sparse_boundary_rows(
-                        paths[p], regular=regular
-                    )
-                allowed_previous = set(paths.get(p - 1, []))
-                boundary_closed = all(
-                    face in allowed_previous for face in full_rows
+            candidates = paths[p]
+            suffix_rejected = singleton_removed = 0
+            boundary_rows = None
+            if can_prune and p >= 3 and previous_candidates is not None:
+                support = set(previous_candidates)
+                candidates = [path for path in candidates
+                              if path[:-1] in support and path[1:] in support]
+                suffix_rejected = len(paths[p]) - len(candidates)
+            if can_prune and p == 2:
+                candidates = _omega2_support(candidates, edge_set, regular)
+                singleton_removed = len(paths[p]) - len(candidates)
+            elif (can_prune and p >= 3 and candidates and
+                  res.dim_omega.get(2) != res.dim_allowed.get(2)):
+                candidates, boundary_rows, singleton_removed = _prune_omega_singletons(
+                    candidates, edge_set, regular, kind, modulus,
                 )
-                if method in ("auto", "kernel"):
-                    condition_rows = [
-                        row for face, row in full_rows.items()
-                        if face not in allowed_previous
-                    ]
-                    if kind == "Q":
-                        condition_rank = _q_sparse_rank_certified(
-                            condition_rows, n_paths
-                        )
-                    else:
-                        condition_rank = _sparse_rank(
-                            condition_rows, n_paths, kind, modulus
-                        )
-                else:
-                    conditions = _omega_conditions(
-                        paths, edge_list, p, kind, modulus,
-                        method=method, regular=regular,
-                    )
-                    condition_rank = _rank(conditions) if conditions.size else 0
-                if kind == "Q":
-                    if p == 1:
-                        # A directed incidence matrix has rank |V|-c over Q,
-                        # where c is the number of weak components.
-                        full_rank = _incidence_rank(paths[0], paths[1])
-                    else:
-                        # When every face is allowed, this is an honest chain
-                        # map A_p -> A_{p-1}.  Hence rank(d_p) is at most the
-                        # already-known nullity of d_{p-1}; reaching this bound
-                        # modulo two certifies the exact rational rank.
-                        chain_upper = (
-                            res.dim_cycles[p - 1] if boundary_closed else None
-                        )
-                        full_rank = _q_sparse_rank_certified(
-                            full_rows.values(), n_paths, chain_upper
-                        )
-                else:
-                    full_rank = _sparse_rank(
-                        full_rows.values(), n_paths, kind, modulus
-                    )
+            n_paths = len(candidates)
+            if can_prune and p >= 3 and res.dim_omega[p - 1] == 0:
+                condition_rank = full_rank = n_paths
+                if res.pruned_from_dimension is None:
+                    res.pruned_from_dimension = p
+            else:
+                condition_rank, full_rank = _sparse_path_ranks(
+                    {p: candidates, p - 1: paths.get(p - 1, [])},
+                    edge_list, p, kind, modulus, method, regular,
+                    res.dim_cycles.get(p - 1, 0),
+                    boundary_rows=boundary_rows,
+                )
+            previous_candidates = candidates if len(candidates) < len(paths[p]) else None
+            res.candidate_counts[p] = n_paths
+            res.support_pruning[p] = dict(singleton_removed=singleton_removed,
+                                         prefix_suffix_excluded=suffix_rejected)
             res.dim_omega[p] = n_paths - condition_rank
             res.dim_cycles[p] = n_paths if p == 0 else n_paths - full_rank
             res.omega_basis[p] = []
             res.omega_paths[p] = []
-            res.omega_matrix[p] = _field_zeros((n_paths, 0), kind, modulus)
+            res.omega_matrix[p] = _field_zeros((len(paths[p]), 0), kind, modulus)
             res.cycles[p] = []
             res.boundaries[p] = []
             res.homology_basis[p] = []
@@ -2217,12 +2821,31 @@ def path_homology(
     # ---- Omega_p -----------------------------------------------------------
     dtype = dtype_for(kind)
     omega_is_full: Dict[int, bool] = {}
+    can_prune_basis = (kind != "R" and method in ("auto", "kernel")
+                       and all(u != v for u, v in edge_list))
+    edge_set = set(edge_list)
+    previous_support = None
     for p in range(0, dim_max + 1):
-        basis, conditions = omega_basis(
-            paths, edge_list, p, method=method, regular=regular,
-            field=field if field is not None else ("Q" if exact else "R"),
-        )
-        omega_is_full[p] = conditions.shape[0] == 0
+        if (can_prune_basis and p >= 2 and
+                not (p >= 3 and omega_is_full.get(2))):
+            candidates = paths[p]
+            if previous_support is not None:
+                candidates = [path for path in candidates
+                              if path[:-1] in previous_support and path[1:] in previous_support]
+            before = len(candidates)
+            basis, removed = _supported_omega_basis(
+                paths[p], candidates, edge_set, kind, modulus, regular,
+            )
+            res.candidate_counts[p] = before - removed
+            res.support_pruning[p] = dict(singleton_removed=removed,
+                                         prefix_suffix_excluded=len(paths[p]) - before)
+        else:
+            basis, _ = omega_basis(
+                paths, edge_list, p, method=method, regular=regular,
+                field=field if field is not None else ("Q" if exact else "R"),
+            )
+            res.candidate_counts[p] = len(paths[p])
+        omega_is_full[p] = len(basis) == len(paths[p])
         res.omega_basis[p] = basis
         n = len(paths[p])
         mat = (
@@ -2233,9 +2856,14 @@ def path_homology(
         res.omega_matrix[p] = mat
         res.omega_paths[p] = [_vec_to_dict(b, paths[p]) for b in basis]
         res.dim_omega[p] = len(basis)
+        previous_support = (None if omega_is_full[p] else
+                            {path for chain in res.omega_paths[p] for path in chain})
     # Omega_p = 0 beyond dim_max (there are no allowed paths there)
     res.dim_omega[dim_max + 1] = 0
     res.omega_matrix[dim_max + 1] = _field_zeros((0, 0), kind, modulus)
+
+    if homology_method == "morse":
+        return _morse_path_result(res, dim_max, kind, modulus, regular, verbose)
 
     # ---- differentials between the Omega bases ----------------------------
     # d_p : Omega_p -> Omega_{p-1}, expressed in the Omega bases.  We obtain it

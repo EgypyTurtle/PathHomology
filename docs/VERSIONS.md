@@ -1,5 +1,12 @@
 # Version record for `core.py`
 
+> Historical gen0–gen3 record. The current root core is now **gen6**;
+> see [the current version index](../VERSIONS.md),
+> [Morse theory and implementation](ALGEBRAIC_MORSE_PATH_HOMOLOGY_20261019.md),
+> and [the repository update](REPOSITORY_UPDATE.md).
+> The unmodified earlier version of this document is archived as
+> [VERSIONS_gen0_gen3.md](VERSIONS_gen0_gen3.md).
+
 The four generations of `core.py`, their hashes, and which generation produced which
 result. The purpose is to prevent conclusions from being drawn against a stale copy.
 
